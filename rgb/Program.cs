@@ -7,6 +7,7 @@ using System.IO;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using Newtonsoft.Json;
 
 namespace rgb
 {
@@ -15,32 +16,38 @@ namespace rgb
         static void Main(string[] args)
         {
             var folder = args[0];
+            var format = args.Length > 1 ? args[1] : "csv";
             var allFiles = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories);
-            foreach (var file in allFiles)
-            {
-                ProcessFile(file);
-            }
+
+            var colors =
+                allFiles
+                    .Select(file => new { file = Path.GetFileNameWithoutExtension(file), color = ProcessFile(file) })
+                    .Where(r => r.color != Color.Empty)
+                    .Select(r => new { r.color.R, r.color.G, r.color.B, Hex = HexConverter(r.color), File = r.file })
+                    .ToList();
+
+            if (format == "json")
+                Console.Write(JsonConvert.SerializeObject(colors));
+            else
+                colors.ForEach(r => Console.WriteLine(string.Format("{0}, {1} {2} {3}, {4}", r.File, r.R, r.G, r.B, r.Hex)));
+
         }
 
-        private static void ProcessFile(string file)
+        static Color ProcessFile(string file)
         {
-            Image image = null;
-            try {
-                image = Image.FromFile(file);
+            try
+            {
+                var image = Image.FromFile(file);
+                var pixel = ResizeImage(image, 1, 1).GetPixel(0, 0);
+                return pixel;                    
             }
             catch
             {
-                //not an image
-            }
-            if(image != null)
-            {
-                var pixel = ResizeImage(image, 1, 1).GetPixel(0,0);
-                var rgb = HexConverter(pixel); 
-                Console.WriteLine(string.Format("{0}, {1} {2} {3}, {4}", file, pixel.R, pixel.G, pixel.B, rgb));
-            }
+                return Color.Empty;
+            }            
         }
 
-        private static String HexConverter(System.Drawing.Color c)
+        static String HexConverter(System.Drawing.Color c)
         {
             return "#" + c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2");
         }
